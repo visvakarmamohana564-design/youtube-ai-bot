@@ -283,36 +283,56 @@
     <div class="badge-live">● AUTO READY</div>
   </div>
 
-  <!-- MAIN CARD: REFERENCE VIDEO + PROMPT TO VIDEO & UPLOAD -->
+  <!-- LATEST GENERATED 3D VIDEO PLAYER CARD (AT THE VERY TOP!) -->
+  <div class="card" id="playerCard" style="border:2px solid #10b981;">
+    <div class="card-title">
+      <span>📚 MP Board कक्षा 10वीं NCERT चैप्टर व्याख्या (5:57 Mins)</span>
+      <span style="font-size:11px;color:#34d399;">मूल पाठ वाचन + अंदर की बातें</span>
+    </div>
+    <div id="videoTitleLabel" style="font-size:13px;color:#cbd5e1;font-weight:700;margin-bottom:6px;">
+      कक्षा 10 हिंदी (क्षितिज भाग-2) — पाठ: नेताजी का चश्मा (स्वयं प्रकाश) 👇
+    </div>
+    <video id="videoPlayer" controls playsinline preload="metadata" poster="videos/mpboard_c10_netaji_thumb.jpg">
+      <source id="videoSource" src="videos/mpboard_c10_netaji_ka_chashma.mp4?v=1" type="video/mp4" />
+    </video>
+    <div class="btn-row">
+      <a id="downloadBtn" href="videos/mpboard_c10_netaji_ka_chashma.mp4?v=1" download="mpboard_c10_netaji_ka_chashma.mp4" class="sub-btn" style="background:#10b981;border-color:#10b981;">
+        📥 Phone Mein Video Download Karein
+      </a>
+      <a href="https://www.youtube.com/channel/UCL5oL_hoUV5S6wlmQLsKArw" target="_blank" class="sub-btn primary">
+        📺 Open YouTube Channel
+      </a>
+    </div>
+  </div>
+
+  <!-- MAIN CARD: CHAPTER PHOTOS + PROMPT TO EDUCATIONAL LONG VIDEO -->
   <div class="card">
     <div class="card-title">
-      <span>🎥 1. Sample Video Bhejein (Jis Tarah Ki Video Banwani Hai)</span>
-      <span style="font-size:11px;color:#fbbf24;">Phone Video ya YouTube Link</span>
+      <span>📸 1. Chapter Ki Photos Bhejein (NCERT / Book Pages)</span>
+      <span style="font-size:11px;color:#fbbf24;">Camera ya Gallery Se</span>
     </div>
 
-    <div style="background:#080c14;border:1.5px dashed #6366f1;border-radius:14px;padding:12px;margin-bottom:14px;">
+    <div style="background:#080c14;border:1.5px dashed #10b981;border-radius:14px;padding:12px;margin-bottom:14px;">
       <div style="font-size:12px;color:#cbd5e1;margin-bottom:8px;line-height:1.4;">
-        Apne phone se koi <b>Sample Video (.mp4)</b> chunein ya kisi <b>YouTube Video/Short ka Link</b> daalein — AI uski <b>Animation Style, Characters aur Pacing</b> dekh kar waisi hi nayi video bana dega!
+        Apne phone se <b>Class 10 MP Board NCERT Chapter ke Pages ki Photos</b> chunein — AI saare pages padh kar <b>Master Prompt (10-Step Complete Explanation + Animated Diagrams + 3D Teacher + Quiz)</b> ke saath Long Educational Video bana kar YouTube par upload kar dega!
       </div>
 
-      <!-- FILE UPLOAD FROM PHONE -->
-      <label for="refVideoFile" class="sub-btn" style="width:100%;background:linear-gradient(135deg,#4f46e5,#7c3aed);border:none;padding:11px;margin-bottom:8px;cursor:pointer;">
-        📤 Phone Gallery Se Sample Video Chunein (.mp4 / .mov)
+      <!-- CHAPTER PHOTO UPLOAD FROM PHONE -->
+      <label for="chapterPhotosInput" class="sub-btn" style="width:100%;background:linear-gradient(135deg,#059669,#2563eb);border:none;padding:12px;margin-bottom:8px;cursor:pointer;font-size:13.5px;">
+        📷 Chapter Pages Ki Photos Chunein (Multiple Photos)
+      </label>
+      <input id="chapterPhotosInput" type="file" accept="image/*" multiple style="display:none;" onchange="handleChapterPhotos(this)" />
+
+      <!-- SAMPLE VIDEO OPTIONAL -->
+      <label for="refVideoFile" class="sub-btn" style="width:100%;background:#1e293b;border:1px solid #334155;padding:9px;margin-bottom:6px;cursor:pointer;font-size:11.5px;">
+        🎥 (Optional) Reference Video Style Chunein (.mp4)
       </label>
       <input id="refVideoFile" type="file" accept="video/*" style="display:none;" onchange="handleReferenceVideoFile(this)" />
 
-      <!-- OR YOUTUBE LINK -->
-      <div style="display:flex;gap:6px;">
-        <input id="refYtUrl" type="text" placeholder="🔗 Ya YouTube Video / Short ka Link paste karein..." style="flex:1;background:#0f172a;border:1px solid #334155;color:#fff;padding:9px 11px;border-radius:10px;font-size:12px;" />
-        <button onclick="handleReferenceYouTubeUrl()" class="sub-btn" style="background:#2563eb;border-color:#2563eb;white-space:nowrap;">
-          🔍 Style Pakdo
-        </button>
-      </div>
-
-      <!-- REFERENCE PREVIEW & AI STYLE ANALYSIS STATUS -->
+      <!-- PREVIEW & AI CHAPTER OCR STATUS -->
       <div id="refPreviewBox" style="display:none;margin-top:10px;background:#0f172a;border:1px solid #334155;border-radius:12px;padding:10px;">
         <div id="refStatusText" style="font-size:12px;font-weight:800;color:#34d399;margin-bottom:6px;">
-          🔍 AI Sample Video Ki Style Samajh Raha Hai...
+          🔍 AI Chapter Photos Padh Raha Hai...
         </div>
         <video id="refVideoPreview" controls muted playsinline style="display:none;max-height:170px;width:100%;border-radius:10px;margin-bottom:6px;"></video>
         <div id="refFramesRow" style="display:flex;gap:6px;overflow-x:auto;margin-top:4px;"></div>
@@ -321,31 +341,27 @@
     </div>
 
     <div class="card-title">
-      <span>✍️ 2. Apna Video Prompt / Kahani Topic</span>
-      <span style="font-size:11px;color:#34d399;">Auto-Fill ya Khud Likhein</span>
+      <span>✍️ 2. Chapter Ka Naam / Extracted Chapter Text</span>
+      <span style="font-size:11px;color:#34d399;">Photo Se Auto-Fill ya Likhein</span>
     </div>
 
-    <textarea id="promptInput" class="prompt-box" placeholder="Yahan apni kahani ya topic likhein (Ya upar Sample Video daalein toh AI khud us style ka prompt bana dega)...&#10;&#10;Udaharan:&#10;• जादुई जंगल और सुनहरी परी का रहस्य (3D Animated Story)&#10;• एक गरीब किसान और जादुई सोने का घड़ा"></textarea>
+    <textarea id="promptInput" class="prompt-box" placeholder="Upar Chapter ki Photos chunein (AI khud saara chapter yahan bhar dega) ya Chapter ka naam likhein...&#10;&#10;Udaharan:&#10;• MP Board Class 10 Science Chapter 1: Chemical Reactions and Equations&#10;• MP Board Class 10 English Chapter 1: A Letter to God"></textarea>
 
-    <div class="chips-label">⚡ 1-Click Ready Prompts (Tap karke bharein):</div>
+    <div class="chips-label">⚡ 1-Click MP Board Class 10 NCERT Chapters:</div>
     <div class="chips">
-      <span class="chip" onclick="setPreset('jaadui_jungle', 'long')">🧚‍♀️ जादुई जंगल और सुनहरी परी (3D Movie)</span>
-      <span class="chip" onclick="setPreset('mitti_ghar', 'long')">🏠 जादुई मिट्टी का घर (Cartoon)</span>
-      <span class="chip" onclick="setPreset('bhootiya_haveli', 'long')">👻 भूतिया हवेली का रहस्य</span>
-      <span class="chip" onclick="setPreset('psych_facts', 'shorts')">🧠 5 साइकोलॉजी फैक्ट्स (Short)</span>
+      <span class="chip" onclick="setPreset('sci_ch1', 'long')">🔬 Science Ch 1: Chemical Reactions</span>
+      <span class="chip" onclick="setPreset('eng_ch1', 'long')">✉️ English Ch 1: A Letter to God</span>
+      <span class="chip" onclick="setPreset('hin_ch1', 'long')">📖 हिंदी: नेताजी का चश्मा</span>
+      <span class="chip" onclick="setPreset('sst_ch1', 'long')">🌍 SST: Nationalism in Europe</span>
     </div>
 
     <div class="card-title" style="margin-top:4px;">
-      <span>🎞️ 2. Video Format Chunein</span>
+      <span>🎞️ 3. Video Format (Locked: Educational Long Video)</span>
     </div>
-    <div class="format-grid">
-      <div id="fmtLong" class="fmt-btn active" onclick="selectFormat('long')">
-        🎬 Long Story (16:9)
-        <small>3D Pixar / Cartoon Kahani</small>
-      </div>
-      <div id="fmtShorts" class="fmt-btn" onclick="selectFormat('shorts')">
-        ⚡ YouTube Short (9:16)
-        <small>60s Viral Hindi Facts</small>
+    <div style="margin-bottom:14px;">
+      <div id="fmtLong" class="fmt-btn active" style="width:100%;cursor:default;">
+        📚 Educational Long Video (16:9 Full HD • Category: Education)
+        <small>Master Prompt: Hook → Concepts → Step-by-Step Demo → Board Prep → Quiz (No Shorts)</small>
       </div>
     </div>
 
@@ -366,28 +382,6 @@
       <div id="step2" class="step-item">⏳ Step 2: Multi-Joint 3D Animation & Hindi Voiceover Render...</div>
       <div id="step3" class="step-item">⏳ Step 3: YouTube Channel (Hindi Fact) par Direct Upload...</div>
       <div id="progMsg" style="margin-top:8px;font-size:12px;color:#e2e8f0;line-height:1.4;"></div>
-    </div>
-  </div>
-
-  <!-- LATEST GENERATED 3D VIDEO PLAYER CARD -->
-  <div class="card" id="playerCard">
-    <div class="card-title">
-      <span>🎥 Latest Generated 3D Animated Movie (10:51 Mins)</span>
-      <span style="font-size:11px;color:#fbbf24;">1080p Full HD • 24 Scenes</span>
-    </div>
-    <div id="videoTitleLabel" style="font-size:13px;color:#cbd5e1;font-weight:700;margin-bottom:4px;">
-      समय की टूटी घड़ी और नन्हा कारीगर 🕰️✨ (11-Min 3D Animated Hindi Film)
-    </div>
-    <video id="videoPlayer" controls preload="metadata" poster="videos/samay_ghadi_3d_thumb.jpg">
-      <source id="videoSource" src="videos/samay_ghadi_3d_animated_movie.mp4" type="video/mp4" />
-    </video>
-    <div class="btn-row">
-      <a id="downloadBtn" href="videos/samay_ghadi_3d_animated_movie.mp4" download="samay_ghadi_3d_animated_movie.mp4" class="sub-btn">
-        📥 Download HD MP4
-      </a>
-      <a href="https://www.youtube.com/channel/UCL5oL_hoUV5S6wlmQLsKArw" target="_blank" class="sub-btn primary">
-        📺 Open YouTube Channel
-      </a>
     </div>
   </div>
 
@@ -525,11 +519,71 @@
     }
 
     const PRESETS = {
-      jaadui_jungle: "जादुई जंगल और सुनहरी परी का रहस्य — 3D Animated Hindi Fantasy Moral Story featuring Aarav (10yo boy in blue kurta & red scarf), Mishri the Golden Fairy, Bholu the White Rabbit with green collar & golden bell, and Kaalvan the Shadow Guardian. Moral: सच्ची अच्छाई ही सबसे बड़ा जादू है।",
-      mitti_ghar: "जादुई मिट्टी का घर — एक गरीब और ईमानदार किसान गोविंद और उसके बेटे शिखर की कहानी, जिन्होंने नदी किनारे एक चमत्कारी मिट्टी का घर बनाया।",
-      bhootiya_haveli: "पुरानी हवेली और जादुई लालटेन का रहस्य — गाँव के बाहर स्थित रहस्यमयी हवेली की रोमांचक और शिक्षाप्रद कहानी।",
-      psych_facts: "इंसानी दिमाग और मनोविज्ञान से जुड़े 5 सबसे चौंकाने वाले रहस्य जो 99% लोग नहीं जानते!"
+      sci_ch1: "MP Board Class 10 NCERT Science (English Medium with Hindi Explanation) — Chapter 1: Chemical Reactions and Equations (Complete Chapter: Chemical Equations, Balanced Equations, Combination, Decomposition, Displacement, Double Displacement, Oxidation-Reduction, Corrosion & Rancidity + Quiz).",
+      eng_ch1: "MP Board Class 10 NCERT English (First Flight) — Chapter 1: A Letter to God by G.L. Fuentes (Complete Chapter Explanation in Hindi with English Key Terms, Character Sketch of Lencho & Postmaster, Important Definitions, Board Questions & Quiz).",
+      hin_ch1: "MP Board कक्षा 10 NCERT हिंदी (क्षितिज भाग-2) — पाठ: नेताजी का चश्मा (स्वयं प्रकाश) | संपूर्ण पाठ व्याख्या, कठिन शब्दार्थ, बोर्ड परीक्षा प्रश्न-उत्तर और क्विज़।",
+      sst_ch1: "MP Board Class 10 NCERT Social Science (History) — Chapter 1: The Rise of Nationalism in Europe (Complete Chapter Explanation in Hindi with English Terms, Timeline, Dates, Unification of Germany & Italy, Board Prep & Quiz)."
     };
+
+    async function handleChapterPhotos(input) {
+      const files = Array.from(input.files || []);
+      if (!files.length) return;
+
+      const box = document.getElementById("refPreviewBox");
+      const statusEl = document.getElementById("refStatusText");
+      const vidEl = document.getElementById("refVideoPreview");
+      const framesRow = document.getElementById("refFramesRow");
+      const sumEl = document.getElementById("refStyleSummary");
+
+      box.style.display = "block";
+      vidEl.style.display = "none";
+      framesRow.innerHTML = "";
+      sumEl.innerText = "";
+      statusEl.innerText = `⏳ Chapter Ki ${files.length} Photo(s) Read Ki Ja Rahi Hain...`;
+
+      const b64List = [];
+      for (const file of files.slice(0, 8)) {
+        const dataUrl = await new Promise((res) => {
+          const reader = new FileReader();
+          reader.onload = () => res(reader.result);
+          reader.readAsDataURL(file);
+        });
+        const img = new Image();
+        await new Promise((res) => {
+          img.onload = () => res();
+          img.src = dataUrl;
+        });
+        const canvas = document.createElement("canvas");
+        const scale = Math.min(1, 1024 / Math.max(img.width, img.height));
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        const jpgUrl = canvas.toDataURL("image/jpeg", 0.82);
+        b64List.push(jpgUrl.split(",")[1]);
+
+        const thumb = document.createElement("img");
+        thumb.src = jpgUrl;
+        thumb.style.height = "64px";
+        thumb.style.borderRadius = "8px";
+        thumb.style.border = "1px solid #10b981";
+        framesRow.appendChild(thumb);
+      }
+
+      const ocrPrompt =
+        "You are an expert MP Board Class 10 NCERT teacher. Read all the uploaded textbook page photos carefully. " +
+        "Extract: (1) Subject & Chapter Name, (2) Complete Topic Checklist of all headings, subheadings, definitions, formulas/equations, examples, and questions visible on these pages, and " +
+        "(3) Write a complete, detailed Chapter Teaching Brief so the video generator covers 100% of these textbook pages following the 10-step Master Prompt (Hook, Introduction, Basic Concepts, Complete Chapter Explanation, Step-by-Step Demonstrations, Real-Life Examples, Important Definitions, Board Exam Preparation, Quick Revision, Practice Quiz).";
+
+      const result = await callGeminiVisionOrText(ocrPrompt, b64List);
+      if (result) {
+        statusEl.innerText = `✅ Chapter Photos (${files.length} Pages) Read Ho Gayi!`;
+        sumEl.innerText = result.slice(0, 320) + (result.length > 320 ? "..." : "");
+        document.getElementById("promptInput").value =
+          "MP BOARD CLASS 10 NCERT CHAPTER FROM PHOTOS:\n" + result;
+      } else {
+        statusEl.innerText = "✅ Chapter Photos Ready! Niche Chapter ka naam likh kar Generate dabayein.";
+      }
+    }
 
     function getGhToken() {
       const hash = window.location.hash || "";
@@ -541,9 +595,9 @@
     }
 
     function selectFormat(fmt) {
-      selectedFormat = fmt;
-      document.getElementById("fmtLong").classList.toggle("active", fmt === "long");
-      document.getElementById("fmtShorts").classList.toggle("active", fmt === "shorts");
+      selectedFormat = "long";
+      const el = document.getElementById("fmtLong");
+      if (el) el.classList.add("active");
     }
 
     let referenceStyleNotes = "";

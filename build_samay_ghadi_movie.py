@@ -1199,11 +1199,9 @@ def build_and_upload_samay_ghadi_movie():
         "-pix_fmt", "rgb24", "-s", f"{width}x{height}", "-r", str(anim_fps),
         "-i", "-",
         "-i", master_wav,
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "21",
-        "-maxrate", "1250k", "-bufsize", "2500k",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "19",
         "-r", str(out_fps), "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "128k",
-        "-movflags", "+faststart",
         "-shortest",
         out_mp4_tmp
     ]
@@ -1279,8 +1277,22 @@ def build_and_upload_samay_ghadi_movie():
 
     proc.stdin.close()
     proc.wait()
+    bank = None
+    SG_POSE_BANK.clear()
+    GEAR_SPRITES.clear()
+    import gc
+    gc.collect()
     if os.path.exists(out_mp4_tmp):
-        os.replace(out_mp4_tmp, out_mp4)
+        subprocess.run([
+            ff, "-y", "-i", out_mp4_tmp,
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+            "-maxrate", "650k", "-bufsize", "1300k", "-threads", "2",
+            "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+            "-c:a", "copy", out_mp4
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        os.remove(out_mp4_tmp)
+    if os.path.exists(master_wav):
+        os.remove(master_wav)
 
     if os.path.exists(master_wav):
         os.remove(master_wav)

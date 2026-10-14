@@ -1,39 +1,32 @@
-name: 🤖 YouTube AI Auto-Upload Bot (Shorts + Long Videos)
+name: 📚 YouTube AI Auto-Upload Bot (MP Board Class 10th NCERT Educational Long Videos ONLY)
 
 on:
   # =========================================================================
-  # 4 DAILY INDIAN PRIME-TIME VIRAL SLOTS (IST = UTC + 5:30)
+  # DAILY EDUCATIONAL LONG VIDEO SCHEDULE (IST = UTC + 5:30) — NO SHORTS!
   # =========================================================================
   schedule:
-    # 1. Subah 7:30 AM IST — Morning Viral Short (02:00 UTC)
+    # 1. Subah 7:30 AM IST — Morning Study Class 10 NCERT Chapter Long Video (02:00 UTC)
     - cron: '0 2 * * *'
 
-    # 2. Dopahar 1:30 PM IST — Midday Viral Short (08:00 UTC)
-    - cron: '0 8 * * *'
-
-    # 3. Shaam 6:30 PM IST — Peak Prime-Time Viral Short (13:00 UTC)
+    # 2. Shaam 6:30 PM IST — Evening Revision Class 10 NCERT Chapter Long Video (13:00 UTC)
     - cron: '0 13 * * *'
-
-    # 4. Raat 8:30 PM IST — Daily Night Animated Horror / Jaadui Kahani Long Video (15:00 UTC)
-    - cron: '0 15 * * *'
 
   workflow_dispatch:
     inputs:
       video_type:
-        description: 'Video Type (shorts = Hindi Facts, long = Horror/Jaadui Kahani)'
+        description: 'Video Type (Locked to Educational Long Video 16:9)'
         required: true
-        default: 'shorts'
+        default: 'long'
         type: choice
         options:
-          - shorts
           - long
       custom_topic:
-        description: 'Optional Custom Topic / Kahani (Khali chhodne par Default chalega)'
+        description: 'Optional MP Board Class 10 NCERT Chapter Name (Khali chhodne par Agla Chapter chalega)'
         required: false
         default: ''
         type: string
       voice_style:
-        description: 'Optional Voice Style (male / female)'
+        description: 'Optional Teacher Voice Style (male / female)'
         required: false
         default: 'male'
         type: choice
@@ -73,42 +66,37 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: 📦 Install Dependencies & Fonts
+      - name: 📦 Install Dependencies & Devanagari Fonts
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg fonts-dejavu-core fonts-liberation pango1.0-tools
-          mkdir -p ~/.local/share/fonts
+          mkdir -p ~/.local/share/fonts ~/.fonts
           cp assets/NotoSansDevanagari-Bold.ttf ~/.local/share/fonts/ || true
+          cp assets/NotoSansDevanagari-Bold.ttf ~/.fonts/ || true
           fc-cache -f || true
           pip install -q -r requirements.txt
 
-      - name: 🕒 Decide Video Type
+      - name: 📚 Lock Format to Educational Long Video (16:9)
         id: decide
         run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "vtype=${{ github.event.inputs.video_type }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event.schedule }}" == "0 15 * * *" ]; then
-            echo "vtype=long" >> $GITHUB_OUTPUT
-          else
-            echo "vtype=shorts" >> $GITHUB_OUTPUT
-          fi
+          echo "vtype=long" >> $GITHUB_OUTPUT
 
-      - name: "🧠 Step 2 - AI Script, Title & Description Likhna"
+      - name: "🧠 Step 2 - MP Board Class 10 NCERT Chapter Plan & Explanation Likhna"
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           CUSTOM_TOPIC: ${{ github.event.inputs.custom_topic }}
         run: |
-          python main.py --step script --type "${{ steps.decide.outputs.vtype }}" --topic "${CUSTOM_TOPIC}"
+          python main.py --step script --type long --topic "${CUSTOM_TOPIC}"
 
-      - name: "🎬 Step 3 - Hindi Voiceover, Visuals & Video Render"
+      - name: "🎬 Step 3 - 1080p Smart-Board Chapter Reading & Explanation Render"
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           VOICE_STYLE_IN: ${{ github.event.inputs.voice_style }}
         run: |
           VVOICE="${VOICE_STYLE_IN:-male}"
-          python main.py --step render --type "${{ steps.decide.outputs.vtype }}" --voice "${VVOICE}"
+          python main.py --step render --type long --voice "${VVOICE}"
 
-      - name: "🚀 Step 4 - YouTube Channel Par Auto-Upload"
+      - name: "🚀 Step 4 - YouTube Channel Par Educational Long Video Upload (Category 27)"
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
@@ -117,14 +105,14 @@ jobs:
           PUBLISH_AT_IN: ${{ github.event.inputs.publish_at }}
         run: |
           VPRIV="${PRIVACY_IN:-public}"
-          python main.py --step upload --type "${{ steps.decide.outputs.vtype }}" --privacy "${VPRIV}" --publish-at "${PUBLISH_AT_IN}"
+          python main.py --step upload --type long --privacy "${VPRIV}" --publish-at "${PUBLISH_AT_IN}"
 
-      - name: 💾 Save Topic History
+      - name: 💾 Save Covered Chapter History
         run: |
           if [ -f topic_history.json ]; then
             git config user.name "YouTube AI Bot"
             git config user.email "bot@users.noreply.github.com"
             git add topic_history.json
-            git diff --staged --quiet || git commit -m "chore: update covered topics history [skip ci]"
+            git diff --staged --quiet || git commit -m "chore: update covered MP Board chapters history [skip ci]"
             git push
           fi

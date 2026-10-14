@@ -1,342 +1,339 @@
 """
-Crystal-Clear 1080p HD Video & Animation Maker (Shorts 9:16 + Long 16:9)
-- ZERO Zoom-In / Zoom-Out (100% Steady, Razor-Sharp 1080p HD Frame!)
-- Long Videos (Horror / Jaadui Kahani): Full 24 FPS 1080p 2D Animated Indian Cartoon Engine
-  where characters walk along the village/forest road and talk in sync with the Hindi audio!
-- Short Videos (Hindi Facts): Crisp 1080p HD Multi-Shot Visuals (2 visual cuts per scene + animated overlays)
-  with 100% proper aspect ratio (never stretched or blurry!)
+MP Board Class 10th NCERT Educational Long Video Renderer (16:9 Full HD, 1920x1080)
+- 100% Educational Purpose (YouTube Category 27: Education)
+- Renders each chapter section in two clear phases:
+  Phase 1: 📖 NCERT मूल पाठ वाचन (Highlights Left Book Passage + Visual Illustration while reading chapter text)
+  Phase 2: 💡 अंदर की बातों की सरल व्याख्या (Highlights Right Deep Explanation + Word Meanings + MP Board IMP Question)
+- Streams directly to FFmpeg for low-memory, fast 1080p HD rendering on GitHub Actions & Local Server
 """
 
-import json
 import os
+import math
+import wave
 import random
+import shutil
 import subprocess
-import time
 from io import BytesIO
 import requests
 import numpy as np
 import imageio_ffmpeg
 from gtts import gTTS
-from PIL import Image, ImageDraw, ImageFont, ImageEnhance
-from moviepy.editor import (
-    AudioFileClip,
-    VideoClip,
-    concatenate_videoclips,
-    CompositeAudioClip,
-    afx
-)
+from PIL import Image, ImageDraw, ImageEnhance
 import config
-from cartoon_animator import create_animated_story_clip, build_kookoo_thumbnail
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MP_ASSETS = os.path.join(BASE_DIR, "assets", "mpboard_c10")
+TEMP_DIR = "/tmp/mpboard_auto_build"
+
+os.makedirs(MP_ASSETS, exist_ok=True)
+os.makedirs(TEMP_DIR, exist_ok=True)
 
 
-def generate_voiceover(text: str, output_wav_path: str):
-    """Generates clear Hindi voiceover WAV file with warm broadcast EQ."""
-    voice_style = getattr(config, "VOICE_STYLE", "male")
-    ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
-    temp_mp3 = output_wav_path + ".temp.mp3"
+def _ensure_devanagari_font():
+    font_src = os.path.join(BASE_DIR, "assets", "NotoSansDevanagari-Bold.ttf")
+    user_fonts = os.path.expanduser("~/.fonts")
+    os.makedirs(user_fonts, exist_ok=True)
+    dst = os.path.join(user_fonts, "NotoSansDevanagari-Bold.ttf")
+    if os.path.exists(font_src) and not os.path.exists(dst):
+        shutil.copy2(font_src, dst)
+        subprocess.run(["fc-cache", "-f"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
+
+_ensure_devanagari_font()
+
+
+def _sanitize_pango_markup(text: str) -> str:
+    """Keeps <b> and </b> tags while escaping stray & or < > characters."""
+    if not text:
+        return ""
+    s = str(text).replace("&", " और ")
+    s = s.replace("<b>", "___B_OPEN___").replace("</b>", "___B_CLOSE___")
+    s = s.replace("<", "(").replace(">", ")")
+    s = s.replace("___B_OPEN___", "<b>").replace("___B_CLOSE___", "</b>")
+    return s
+
+
+def render_pango_block(markup_text: str, width_px: int, font_size: int = 19) -> Image.Image:
+    """Renders multi-line Pango markup with 100% accurate Hindi Devanagari shaping and exact pixel width."""
+    os.makedirs(TEMP_DIR, exist_ok=True)
+    pango_bin = "/usr/bin/pango-view"
+    pango_pts = int(width_px * 0.71)
+    out_png = os.path.join(TEMP_DIR, f"pango_{abs(hash((markup_text, pango_pts, font_size))) % 10000000}.png")
+    if not os.path.exists(out_png):
+        cmd = [
+            pango_bin,
+            "--no-display",
+            "--markup",
+            f"--font=Noto Sans Devanagari Bold {font_size}",
+            f"--width={pango_pts}",
+            "--margin=4",
+            "--background=#00000000",
+            f"--output={out_png}",
+            f"--text={markup_text}",
+        ]
+        env = os.environ.copy()
+        env["LC_ALL"] = "C.UTF-8"
+        subprocess.run(cmd, check=True, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    im = Image.open(out_png).convert("RGBA")
+    if im.width > width_px:
+        new_h = max(1, int(im.height * (width_px / float(im.width))))
+        im = im.resize((width_px, new_h), Image.Resampling.LANCZOS)
+    return im
+
+
+def synthesize_voice(text: str, out_wav: str, mode: str = "read"):
+    os.makedirs(os.path.dirname(out_wav), exist_ok=True)
+    mp3_path = out_wav.replace(".wav", ".mp3")
     tts = gTTS(text=text, lang="hi", slow=False)
-    tts.save(temp_mp3)
-
-    rate_mult = "1.02" if voice_style == "female" else "0.94"
-    tempo_mult = "1.12" if voice_style == "female" else "1.15"
-
-    subprocess.run(
-        [
-            ffmpeg_exe, "-y", "-i", temp_mp3,
-            "-filter:a", f"asetrate=24000*{rate_mult},aresample=24000,atempo={tempo_mult}",
-            "-ac", "1", "-ar", "24000",
-            output_wav_path
-        ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=False
+    tts.save(mp3_path)
+    ff = imageio_ffmpeg.get_ffmpeg_exe()
+    af = (
+        "asetrate=24000*1.01,atempo=1.06,aresample=24000,highpass=f=75,dynaudnorm"
+        if mode == "read"
+        else "asetrate=24000*0.98,atempo=1.09,aresample=24000,highpass=f=75,dynaudnorm"
     )
-    if os.path.exists(temp_mp3):
-        os.remove(temp_mp3)
-    return output_wav_path
+    subprocess.run(
+        [ff, "-y", "-i", mp3_path, "-af", af, "-ac", "1", "-ar", "24000", out_wav],
+        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
+    if os.path.exists(mp3_path):
+        os.remove(mp3_path)
 
 
-def _crop_exact(img: Image.Image, target_w: int, target_h: int) -> Image.Image:
-    """Center-crops an image to exact target aspect ratio WITHOUT any stretching or distortion."""
-    src_w, src_h = img.size
-    target_ratio = target_w / target_h
-    src_ratio = src_w / src_h
-
-    if src_ratio > target_ratio:
-        new_w = int(src_h * target_ratio)
-        left = (src_w - new_w) // 2
-        img = img.crop((left, 0, left + new_w, src_h))
-    else:
-        new_h = int(src_w / target_ratio)
-        top = (src_h - new_h) // 2
-        img = img.crop((0, top, src_w, top + new_h))
-
-    img = img.resize((target_w, target_h), Image.Resampling.LANCZOS)
-    img = ImageEnhance.Contrast(img).enhance(1.12)
-    img = ImageEnhance.Sharpness(img).enhance(1.25)
-    return img
-
-
-def fetch_hd_visual(query: str, width: int, height: int, save_path: str, seed: int = 1) -> str:
-    """
-    Fetches a sharp 1280px+ HD photograph from Wikimedia Commons CDN matching `query`,
-    properly center-cropped (NEVER stretched!).
-    """
-    headers = {"User-Agent": "HindiFactBot/3.0 (https://github.com/visvakarmamohana564-design)"}
-    try:
-        resp = requests.get(
-            "https://commons.wikimedia.org/w/api.php",
-            params={
-                "action": "query",
-                "generator": "search",
-                "gsrsearch": f"filetype:bitmap {query}",
-                "gsrnamespace": 6,
-                "gsrlimit": 8,
-                "prop": "imageinfo",
-                "iiprop": "url",
-                "iiurlwidth": 1440,
-                "format": "json"
-            },
-            headers=headers,
-            timeout=6
-        )
-        if resp.status_code == 200:
-            pages = list(resp.json().get("query", {}).get("pages", {}).values())
-            random.Random(seed).shuffle(pages)
-            for p in pages[:4]:
-                thumb_url = p.get("imageinfo", [{}])[0].get("thumburl")
-                if not thumb_url:
-                    continue
-                try:
-                    img_r = requests.get(thumb_url, headers=headers, timeout=6)
-                    if img_r.status_code == 200 and len(img_r.content) > 15000:
-                        im = Image.open(BytesIO(img_r.content)).convert("RGB")
-                        im = _crop_exact(im, width, height)
-                        im.save(save_path, "JPEG", quality=94)
-                        return save_path
-                except Exception:
-                    continue
-    except Exception:
-        pass
-
-    # Fallback: High-Res Picsum CDN (exact aspect ratio)
-    try:
-        r = requests.get(f"https://picsum.photos/seed/{seed}/{width}/{height}", headers=headers, timeout=6)
-        if r.status_code == 200 and len(r.content) > 10000:
-            im = Image.open(BytesIO(r.content)).convert("RGB")
-            im = _crop_exact(im, width, height)
-            im.save(save_path, "JPEG", quality=94)
-            return save_path
-    except Exception:
-        pass
-
-    bg = _build_static_background("village_day", width, height)
-    bg.save(save_path, "JPEG", quality=94)
-    return save_path
-
-
-def _get_font(size: int):
-    font_candidates = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+def _fetch_or_get_illustration(query: str, sec_idx: int, width: int = 884, height: int = 340) -> Image.Image:
+    """Gets a clean illustration for the chapter section."""
+    local_fallbacks = [
+        "netaji_s1_statue.jpg",
+        "netaji_s2_panwala.jpg",
+        "netaji_s3_captain.jpg",
+        "netaji_s4_sarkanda.jpg"
     ]
-    for path in font_candidates:
-        if os.path.exists(path):
-            return ImageFont.truetype(path, size=size)
-    return ImageFont.load_default()
+    headers = {"User-Agent": "MPBoardNCERTBot/1.0"}
+    if query:
+        try:
+            resp = requests.get(
+                "https://commons.wikimedia.org/w/api.php",
+                params={
+                    "action": "query",
+                    "generator": "search",
+                    "gsrsearch": f"filetype:bitmap {query}",
+                    "gsrnamespace": 6,
+                    "gsrlimit": 5,
+                    "prop": "imageinfo",
+                    "iiprop": "url",
+                    "iiurlwidth": 1280,
+                    "format": "json"
+                },
+                headers=headers,
+                timeout=5
+            )
+            if resp.status_code == 200:
+                pages = list(resp.json().get("query", {}).get("pages", {}).values())
+                for p in pages[:3]:
+                    thumb_url = p.get("imageinfo", [{}])[0].get("thumburl")
+                    if thumb_url:
+                        img_r = requests.get(thumb_url, headers=headers, timeout=5)
+                        if img_r.status_code == 200 and len(img_r.content) > 15000:
+                            im = Image.open(BytesIO(img_r.content)).convert("RGBA")
+                            return im.resize((width, height), Image.Resampling.LANCZOS)
+        except Exception:
+            pass
+
+    fb_name = local_fallbacks[(sec_idx - 1) % len(local_fallbacks)]
+    fb_path = os.path.join(MP_ASSETS, fb_name)
+    if os.path.exists(fb_path):
+        return Image.open(fb_path).convert("RGBA").resize((width, height), Image.Resampling.LANCZOS)
+    return Image.new("RGBA", (width, height), (30, 58, 138, 255))
 
 
-def _wrap_text(text: str, font, max_width: int, draw: ImageDraw.ImageDraw) -> list:
-    words = text.split()
-    lines, current = [], []
-    for word in words:
-        test = " ".join(current + [word])
-        bbox = draw.textbbox((0, 0), test, font=font)
-        if (bbox[2] - bbox[0]) <= max_width:
-            current.append(word)
-        else:
-            if current:
-                lines.append(" ".join(current))
-            current = [word]
-    if current:
-        lines.append(" ".join(current))
-    return lines
+def build_smartboard_plate(
+    subject_header: str,
+    sec: dict,
+    sec_idx: int,
+    ill_img: Image.Image,
+    phase: str,
+    width: int = 1920,
+    height: int = 1080
+) -> Image.Image:
+    canvas = Image.new("RGBA", (width, height), (11, 17, 32, 255))
+    draw = ImageDraw.Draw(canvas)
+
+    sec_title = _sanitize_pango_markup(sec.get("title", f"भाग {sec_idx}"))
+    subj_hdr = _sanitize_pango_markup(subject_header or "MP BOARD कक्षा 10वीं NCERT संपूर्ण व्याख्या")
+
+    # Top Header Bar
+    draw.rounded_rectangle([24, 16, width - 24, 96], radius=18, fill=(22, 34, 62, 255), outline=(59, 130, 246, 255), width=2)
+    hdr_markup = (
+        f"<span foreground='#FBBF24' weight='heavy' size='18500'>{subj_hdr}</span>   "
+        f"<span foreground='#FFFFFF' weight='heavy' size='19000'>|   {sec_title}</span>"
+    )
+    hdr_img = render_pango_block(hdr_markup, width - 90, font_size=18)
+    canvas.paste(hdr_img, (44, 30), hdr_img)
+
+    # Mode Status Pill Bar
+    if phase == "read":
+        pill_bg = (6, 78, 59, 255)
+        pill_border = (16, 185, 129, 255)
+        mode_markup = "<span foreground='#6EE7B7' weight='heavy' size='18500'>▶ अभी चल रहा है: NCERT मूल पाठ वाचन (चैप्टर की पंक्तियाँ ध्यान से सुनें और पढ़ें)</span>"
+    else:
+        pill_bg = (88, 28, 135, 255)
+        pill_border = (192, 132, 252, 255)
+        mode_markup = "<span foreground='#FDE047' weight='heavy' size='18500'>▶ अभी चल रहा है: अंदर की बातों की सरल व्याख्या (गहरा अर्थ, शब्दार्थ और परीक्षा बिंदु)</span>"
+
+    draw.rounded_rectangle([24, 106, width - 24, 160], radius=14, fill=pill_bg, outline=pill_border, width=2)
+    mode_img = render_pango_block(mode_markup, width - 80, font_size=18)
+    canvas.paste(mode_img, (44, 116), mode_img)
+
+    # LEFT PANEL: Scene Illustration + NCERT Book Passage
+    left_border = (16, 185, 129, 255) if phase == "read" else (51, 65, 85, 255)
+    left_w = 4 if phase == "read" else 2
+    draw.rounded_rectangle([24, 172, 948, 986], radius=20, fill=(17, 24, 39, 255), outline=left_border, width=left_w)
+
+    canvas.paste(ill_img, (44, 190))
+    draw.rounded_rectangle([44, 190, 928, 530], radius=14, outline=(251, 191, 36, 220), width=2)
+
+    draw.rounded_rectangle(
+        [40, 542, 932, 970], radius=14,
+        fill=(30, 41, 59, 255) if phase == "read" else (15, 23, 42, 255),
+        outline=(52, 211, 153, 255) if phase == "read" else (51, 65, 85, 200), width=2
+    )
+
+    book_heading = _sanitize_pango_markup(sec.get("book_heading", f"★ NCERT मूल पाठ (भाग {sec_idx}):"))
+    book_text = _sanitize_pango_markup(sec.get("book_text") or sec.get("narration_hindi", ""))
+    book_color = "#FEF08A" if phase == "read" else "#CBD5E1"
+    book_markup = (
+        f"<span foreground='#34D399' weight='heavy' size='19000'>{book_heading}</span>\n"
+        f"<span foreground='{book_color}' weight='bold' size='17500'>{book_text}</span>"
+    )
+    book_img = render_pango_block(book_markup, 860, font_size=18)
+    canvas.paste(book_img, (54, 552), book_img)
+
+    # RIGHT PANEL: Inside Explanation ("अंदर की बातें") + Word Meanings + MP Board Exam Tip
+    right_border = (250, 204, 21, 255) if phase == "explain" else (51, 65, 85, 255)
+    right_w = 4 if phase == "explain" else 2
+    draw.rounded_rectangle(
+        [968, 172, 1896, 986], radius=20,
+        fill=(23, 31, 50, 255) if phase == "explain" else (15, 23, 42, 255),
+        outline=right_border, width=right_w
+    )
+
+    inside_heading = _sanitize_pango_markup(sec.get("inside_heading", "★ अंदर की बातें और सरल व्याख्या (Deep Meaning):"))
+    raw_points = sec.get("inside_points", [])
+    clean_points = [_sanitize_pango_markup(pt) for pt in raw_points]
+    pts_joined = "\n\n".join(clean_points)
+    right_markup = (
+        f"<span foreground='#FBBF24' weight='heavy' size='20000'>{inside_heading}</span>\n\n"
+        f"<span foreground='#F8FAFC' size='17500'>{pts_joined}</span>"
+    )
+    right_img = render_pango_block(right_markup, 884, font_size=18)
+    canvas.paste(right_img, (990, 190), right_img)
+
+    # Bottom Right Box: MP Board Exam Tip
+    draw.rounded_rectangle([986, 848, 1878, 968], radius=14, fill=(127, 29, 29, 255), outline=(248, 113, 113, 255), width=2)
+    exam_tip = _sanitize_pango_markup(sec.get("exam_tip", "★ MP Board IMP प्रश्न: इस गद्यांश का मुख्य भाव अपने शब्दों में स्पष्ट कीजिए।"))
+    tip_markup = f"<span foreground='#FEF08A' weight='heavy' size='17500'>{exam_tip}</span>"
+    tip_img = render_pango_block(tip_markup, 860, font_size=18)
+    canvas.paste(tip_img, (1002, 862), tip_img)
+
+    return canvas
 
 
-def create_crisp_short_clip(
-    scene: dict,
-    audio_path: str,
-    scene_num: int,
-    total_scenes: int,
-    width: int,
-    height: int,
-    fps: int = 24
-) -> VideoClip:
+def build_complete_video(plan: dict, video_type: str = "long") -> tuple:
     """
-    For YouTube Shorts (9:16):
-    - ZERO zoom-in / zoom-out (100% steady, crystal-clear 1080p HD!)
-    - Shows 2 crisp HD visuals per scene (Shot A -> smooth crossfade -> Shot B)
-       PLUS an animated talking character presenter in the corner so the video is lively & clear!
+    Renders a 16:9 Full HD (1920x1080) MP Board Class 10th NCERT Chapter Explanation Long Video.
     """
-    audio_clip = AudioFileClip(audio_path)
-    duration = max(audio_clip.duration + 0.15, 2.6)
-
-    query = scene.get("search_query") or scene.get("video_prompt") or "ancient mystery india"
-    # Clean query to 3 keywords
-    short_q = " ".join(query.replace(",", " ").split()[:4])
-
-    img1_path = os.path.join(config.OUTPUT_DIR, f"s_{scene_num}_a.jpg")
-    img2_path = os.path.join(config.OUTPUT_DIR, f"s_{scene_num}_b.jpg")
-    fetch_hd_visual(short_q, width, height, img1_path, seed=scene_num * 101)
-    fetch_hd_visual(short_q + " detail", width, height, img2_path, seed=scene_num * 202 + 7)
-
-    im1 = Image.open(img1_path).convert("RGB")
-    im2 = Image.open(img2_path).convert("RGB")
-
-    # Pre-build UI & Subtitle overlay
-    font_size = 54
-    font = _get_font(font_size)
-    badge_font = _get_font(34)
-
-    static_ui = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    draw_ui = ImageDraw.Draw(static_ui)
-
-    grad_start = int(height * 0.65)
-    for y in range(grad_start, height):
-        alpha = int(205 * ((y - grad_start) / (height - grad_start)))
-        draw_ui.line([(0, y), (width, y)], fill=(0, 0, 0, alpha))
-
-    badge_text = "★ HINDI FACT ★"
-    b_bbox = draw_ui.textbbox((0, 0), badge_text, font=badge_font)
-    bw = b_bbox[2] - b_bbox[0]
-    bx = (width - bw) // 2
-    by = 88
-    draw_ui.rounded_rectangle([bx - 24, by - 8, bx + bw + 24, by + 44], radius=18, fill=(220, 20, 40, 245))
-    draw_ui.text((bx, by), badge_text, font=badge_font, fill=(255, 255, 255, 255))
-
-    subtitle_text = scene.get("subtitle_hinglish", "")
-    if subtitle_text:
-        lines = _wrap_text(subtitle_text.upper(), font, int(width * 0.84), draw_ui)
-        line_h = font_size + 16
-        base_y = int(height * 0.79) - (len(lines) * line_h) // 2
-        for idx, line in enumerate(lines):
-            bbox = draw_ui.textbbox((0, 0), line, font=font)
-            lw = bbox[2] - bbox[0]
-            lx = (width - lw) // 2
-            ly = base_y + idx * line_h
-            draw_ui.rounded_rectangle([lx - 20, ly - 6, lx + lw + 20, ly + font_size + 8], radius=12, fill=(10, 10, 16, 235))
-            col = (255, 230, 0, 255) if idx % 2 == 0 else (255, 255, 255, 255)
-            draw_ui.text((lx, ly), line, font=font, fill=col, stroke_width=3, stroke_fill=(0, 0, 0, 255))
-
-    arr1 = np.array(Image.alpha_composite(im1.convert("RGBA"), static_ui).convert("RGB"), dtype=np.float32)
-    arr2 = np.array(Image.alpha_composite(im2.convert("RGBA"), static_ui).convert("RGB"), dtype=np.float32)
-
-    def make_frame(t):
-        progress = min(max(t / duration, 0.0), 1.0)
-        # First half shows Shot 1 (steady!), second half smoothly crossfades to Shot 2 (steady!)
-        if progress < 0.45:
-            comp = arr1.copy()
-        elif progress < 0.55:
-            alpha = (progress - 0.45) / 0.10
-            comp = arr1 * (1.0 - alpha) + arr2 * alpha
-        else:
-            comp = arr2.copy()
-
-        comp = comp.astype(np.uint8)
-        overall_progress = ((scene_num - 1) + progress) / max(total_scenes, 1)
-        bar_w = int(width * overall_progress)
-        comp[height - 12:height, :bar_w] = [255, 215, 0]
-        return comp
-
-    clip = VideoClip(make_frame, duration=duration).set_fps(fps)
-    clip = clip.set_audio(audio_clip)
-    return clip
-
-
-def generate_thumbnail(plan: dict, video_type: str, width: int, height: int, output_path: str):
-    """Generates a 4K-mastered Koo Koo TV Hindi Thumbnail with Hindi Devanagari 3D title badge."""
-    title_text = plan.get("title", plan.get("thumbnail_text", "जादुई मिट्टी का घर"))
-    return build_kookoo_thumbnail(title_text, output_path, width=width, height=height)
-
-
-def build_complete_video(plan: dict, video_type: str = "shorts") -> tuple:
+    video_type = "long"
     os.makedirs(config.OUTPUT_DIR, exist_ok=True)
-    cfg = config.VIDEO_CONFIG[video_type]
-    width, height, fps = cfg["width"], cfg["height"], cfg["fps"]
+    os.makedirs(TEMP_DIR, exist_ok=True)
 
     scenes = plan.get("scenes", [])
-    scene_clips = []
+    subject_header = plan.get("subject_header", "MP BOARD कक्षा 10वीं NCERT संपूर्ण व्याख्या")
+    sr = 24000
+    master_wav = os.path.join(TEMP_DIR, "auto_master.wav")
+    segment_plan = []
 
-    print(f"\n🎬 Rendering {len(scenes)} CRYSTAL-CLEAR 1080p scenes for {video_type.upper()} ({width}x{height})...")
+    print(f"\n📚 Rendering {len(scenes)}-Section MP Board Class 10th NCERT Long Video (1920x1080)...")
 
-    for idx, scene in enumerate(scenes, start=1):
-        audio_path = os.path.join(config.OUTPUT_DIR, f"scene_{idx}.wav")
-        narration = scene.get("narration_hindi", "")
-        visual_style = scene.get("visual_style", "cartoon" if video_type == "long" else "realistic")
+    with wave.open(master_wav, "wb") as out_wf:
+        out_wf.setnchannels(1)
+        out_wf.setsampwidth(2)
+        out_wf.setframerate(sr)
 
-        print(f"  -> Scene {idx}/{len(scenes)}: Generating Hindi voiceover & 1080p animation...")
-        generate_voiceover(narration, audio_path)
+        for idx, sec in enumerate(scenes, start=1):
+            read_txt = sec.get("read_audio") or sec.get("narration_hindi") or sec.get("book_text", "")
+            explain_txt = sec.get("explain_audio") or "आइए अब इस भाग के मुख्य बिंदुओं को समझते हैं।"
 
-        # For Long Videos OR Cartoon scenes: use 1080p HD 2D Animated Walking Character Engine (Zero zoom-in/out!)
-        if video_type == "long" or visual_style == "cartoon":
-            clip = create_animated_story_clip(
-                scene=scene,
-                audio_path=audio_path,
-                scene_num=idx,
-                total_scenes=len(scenes),
-                width=width,
-                height=height,
-                fps=fps
-            )
-        else:
-            # For Realistic Fact Shorts: use Crisp 1080p 2-Shot Visuals (Zero zoom-in/out!)
-            clip = create_crisp_short_clip(
-                scene=scene,
-                audio_path=audio_path,
-                scene_num=idx,
-                total_scenes=len(scenes),
-                width=width,
-                height=height,
-                fps=fps
-            )
-        scene_clips.append(clip)
+            r_wav = os.path.join(TEMP_DIR, f"s{idx}_read.wav")
+            synthesize_voice(read_txt, r_wav, mode="read")
+            with wave.open(r_wav, "rb") as wf:
+                r_pcm = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16)
+            out_wf.writeframes(r_pcm.tobytes())
+            r_dur = len(r_pcm) / float(sr)
 
-    final_video = concatenate_videoclips(scene_clips, method="compose")
+            e_wav = os.path.join(TEMP_DIR, f"s{idx}_explain.wav")
+            synthesize_voice(explain_txt, e_wav, mode="explain")
+            with wave.open(e_wav, "rb") as wf:
+                e_pcm = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16)
+            out_wf.writeframes(e_pcm.tobytes())
+            e_dur = len(e_pcm) / float(sr)
 
-    bg_music_path = os.path.join(config.ASSETS_DIR, "bg_music.mp3")
-    if os.path.exists(bg_music_path):
-        print("  -> Mixing background music from assets/bg_music.mp3...")
-        bg_music = AudioFileClip(bg_music_path).fx(afx.audio_loop, duration=final_video.duration)
-        bg_music = bg_music.volumex(0.10)
-        mixed_audio = CompositeAudioClip([final_video.audio, bg_music])
-        final_video = final_video.set_audio(mixed_audio)
+            ill_img = _fetch_or_get_illustration(sec.get("search_query", ""), idx)
+            segment_plan.append((idx, sec, ill_img, r_dur, e_dur))
+            print(f"  -> Section {idx}/{len(scenes)}: Read={r_dur:.1f}s | Explain={e_dur:.1f}s")
 
+    total_dur = sum(r + e for _, _, _, r, e in segment_plan)
     video_out_path = os.path.join(config.OUTPUT_DIR, f"final_{video_type}.mp4")
     thumb_out_path = os.path.join(config.OUTPUT_DIR, f"thumbnail_{video_type}.jpg")
 
-    print(f"🖼️  Generating 1080p HD Thumbnail...")
-    generate_thumbnail(
-        plan=plan,
-        video_type=video_type,
-        width=width,
-        height=height,
-        output_path=thumb_out_path
-    )
+    # Save Thumbnail from Section 1 Explain Plate
+    if segment_plan:
+        _, s1, ill1, _, _ = segment_plan[0]
+        p1 = build_smartboard_plate(subject_header, s1, 1, ill1, "explain", 1920, 1080)
+        p1.resize((1280, 720), Image.Resampling.LANCZOS).convert("RGB").save(thumb_out_path, "JPEG", quality=92)
 
-    print(f"🚀 Exporting final MP4 video to {video_out_path}...")
-    final_video.write_videofile(
-        video_out_path,
-        fps=fps,
-        codec="libx264",
-        audio_codec="aac",
-        threads=4,
-        preset="ultrafast",
-        logger=None
-    )
+    ff = imageio_ffmpeg.get_ffmpeg_exe()
+    fps = 6
+    cmd = [
+        ff, "-y",
+        "-f", "rawvideo", "-vcodec", "rawvideo",
+        "-pix_fmt", "rgb24", "-s", "1920x1080", "-r", str(fps),
+        "-i", "-",
+        "-i", master_wav,
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+        "-maxrate", "450k", "-bufsize", "900k",
+        "-r", "24", "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "96k",
+        "-movflags", "+faststart",
+        "-shortest",
+        video_out_path
+    ]
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    final_video.close()
-    for c in scene_clips:
-        c.close()
+    elapsed = 0.0
+    for idx, sec, ill_img, r_dur, e_dur in segment_plan:
+        for phase, p_dur in [("read", r_dur), ("explain", e_dur)]:
+            base_plate = build_smartboard_plate(subject_header, sec, idx, ill_img, phase, 1920, 1080)
+            n_frames = max(1, int(round(p_dur * fps)))
+            for f_idx in range(n_frames):
+                t_local = f_idx / float(fps)
+                prog_ratio = min(1.0, (elapsed + t_local) / max(1.0, total_dur))
+                frame = base_plate.copy()
+                draw = ImageDraw.Draw(frame)
 
+                scan_y = int(570 + 340 * (0.5 + 0.5 * math.sin(t_local * 1.4))) if phase == "read" else int(230 + 560 * ((t_local / max(1.0, p_dur)) % 1.0))
+                if phase == "read":
+                    draw.rounded_rectangle([30, scan_y, 42, scan_y + 48], radius=5, fill=(16, 185, 129, 255))
+                else:
+                    draw.rounded_rectangle([974, scan_y, 986, scan_y + 54], radius=5, fill=(250, 204, 21, 255))
+
+                draw.rounded_rectangle([24, 1004, 1896, 1030], radius=10, fill=(30, 41, 59, 255))
+                bar_w = max(20, int(1872 * prog_ratio))
+                draw.rounded_rectangle([24, 1004, 24 + bar_w, 1030], radius=10, fill=(16, 185, 129, 255) if phase == "read" else (250, 204, 21, 255))
+
+                proc.stdin.write(frame.convert("RGB").tobytes())
+            elapsed += p_dur
+
+    proc.stdin.close()
+    proc.wait()
+    shutil.rmtree(TEMP_DIR, ignore_errors=True)
     return video_out_path, thumb_out_path
