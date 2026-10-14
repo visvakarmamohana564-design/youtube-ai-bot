@@ -1,15 +1,11 @@
-name: 📚 YouTube AI Auto-Upload Bot (MP Board Class 10th NCERT Educational Long Videos ONLY)
+name: 📚 YouTube AI Auto-Upload Bot (7:00 AM IST Class 10 NCERT Educational Long Videos)
 
 on:
   # =========================================================================
-  # DAILY EDUCATIONAL LONG VIDEO SCHEDULE (IST = UTC + 5:30) — NO SHORTS!
+  # DAILY 7:00 AM IST MORNING EDUCATIONAL LONG VIDEO UPLOAD (01:30 UTC = 7:00 AM IST)
   # =========================================================================
   schedule:
-    # 1. Subah 7:30 AM IST — Morning Study Class 10 NCERT Chapter Long Video (02:00 UTC)
-    - cron: '0 2 * * *'
-
-    # 2. Shaam 6:30 PM IST — Evening Revision Class 10 NCERT Chapter Long Video (13:00 UTC)
-    - cron: '0 13 * * *'
+    - cron: '30 1 * * *'
 
   workflow_dispatch:
     inputs:
@@ -21,7 +17,7 @@ on:
         options:
           - long
       custom_topic:
-        description: 'Optional MP Board Class 10 NCERT Chapter Name (Khali chhodne par Agla Chapter chalega)'
+        description: 'Optional MP Board Class 10 NCERT Chapter Name (Khali chhodne par Scheduled Chapter upload hoga)'
         required: false
         default: ''
         type: string
@@ -54,7 +50,7 @@ permissions:
 jobs:
   generate-and-upload:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     steps:
       - name: 📥 Checkout Repository
@@ -76,43 +72,16 @@ jobs:
           fc-cache -f || true
           pip install -q -r requirements.txt
 
-      - name: 📚 Lock Format to Educational Long Video (16:9)
-        id: decide
-        run: |
-          echo "vtype=long" >> $GITHUB_OUTPUT
-
-      - name: "🧠 Step 2 - MP Board Class 10 NCERT Chapter Plan & Explanation Likhna"
+      - name: "🔬 Render & Auto-Upload Scheduled 7:00 AM IST Class 10 Chapter Video"
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          CUSTOM_TOPIC: ${{ github.event.inputs.custom_topic }}
-        run: |
-          python main.py --step script --type long --topic "${CUSTOM_TOPIC}"
-
-      - name: "🎬 Step 3 - 1080p Smart-Board Chapter Reading & Explanation Render"
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          VOICE_STYLE_IN: ${{ github.event.inputs.voice_style }}
-        run: |
-          VVOICE="${VOICE_STYLE_IN:-male}"
-          python main.py --step render --type long --voice "${VVOICE}"
-
-      - name: "🚀 Step 4 - YouTube Channel Par Educational Long Video Upload (Category 27)"
-        env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
-          PRIVACY_IN: ${{ github.event.inputs.privacy_status }}
-          PUBLISH_AT_IN: ${{ github.event.inputs.publish_at }}
+          CUSTOM_TOPIC: ${{ github.event.inputs.custom_topic }}
         run: |
-          VPRIV="${PRIVACY_IN:-public}"
-          python main.py --step upload --type long --privacy "${VPRIV}" --publish-at "${PUBLISH_AT_IN}"
-
-      - name: 💾 Save Covered Chapter History
-        run: |
-          if [ -f topic_history.json ]; then
-            git config user.name "YouTube AI Bot"
-            git config user.email "bot@users.noreply.github.com"
-            git add topic_history.json
-            git diff --staged --quiet || git commit -m "chore: update covered MP Board chapters history [skip ci]"
-            git push
+          if [ -z "${CUSTOM_TOPIC}" ]; then
+            python build_sci_ch1_master_video.py --upload
+          else
+            python main.py --step all --type long --topic "${CUSTOM_TOPIC}"
           fi
