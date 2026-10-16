@@ -1,8 +1,7 @@
 name: 🧠 BODY SCIENCE — Animated Shorts (8 Topics)
 
 on:
-  schedule:
-    - cron: '30 2 * * *'    # 8:00 AM IST — roz ek animated video
+  # schedule: PAUSED (user bole tabhi ek-ek video banegi)
   workflow_dispatch:
     inputs:
       start_index:
