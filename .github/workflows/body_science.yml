@@ -1,0 +1,70 @@
+name: 🧠 BODY SCIENCE — Animated Shorts (8 Topics)
+
+on:
+  schedule:
+    - cron: '30 2 * * *'    # 8:00 AM IST — roz ek animated video
+  workflow_dispatch:
+    inputs:
+      start_index:
+        description: 'Shuru kaunsa topic? (0 se 7)'
+        required: true
+        default: '0'
+        type: string
+      count:
+        description: 'Kitni videos banani hain?'
+        required: true
+        default: '8'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  body-science:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Python Setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Dependencies (ffmpeg + fonts)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+          pip install -q requests gTTS edge-tts Pillow numpy google-api-python-client google-auth google-auth-oauthlib google-auth-httplib2 google-api-core
+
+      - name: 🎬 Videos Banao + Upload Karo
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            START=${{ github.event.inputs.start_index }}
+            COUNT=${{ github.event.inputs.count }}
+          else
+            START=auto
+            COUNT=1
+          fi
+          if [ "$START" = "auto" ]; then
+            python cloud_body_science.py --upload
+          else
+            for i in $(seq 0 $((COUNT-1))); do
+              IDX=$(( (START + i) % 8 ))
+              echo "================ VIDEO $IDX ================"
+              python cloud_body_science.py --index $IDX --upload
+            done
+          fi
+
+      - name: 💾 Video Files Save (Backup)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: body-science-videos-${{ github.run_number }}
+          path: output/body_science_*.mp4
+          retention-days: 14
