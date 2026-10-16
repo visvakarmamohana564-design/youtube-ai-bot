@@ -1,0 +1,86 @@
+name: 🎬 5 Shorts Models — Auto (Daily Rotation + Manual)
+
+on:
+  schedule:
+    - cron: '45 1 * * *'    # 7:15 AM IST — roz ek model (weekday rotation)
+    - cron: '15 13 * * *'   # 6:45 PM IST — shaam ko dusra model
+  workflow_dispatch:
+    inputs:
+      type:
+        description: 'Kaunsa Model chalana hai?'
+        required: true
+        default: 'fact'
+        type: choice
+        options:
+          - fact
+          - quiz
+          - story
+          - factmyth
+          - top5
+      index:
+        description: 'Optional Number (khali = aaj ka automatic rotation)'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  shorts-model:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Python Setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Dependencies (ffmpeg + fonts)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+          pip install -q -r requirements.txt
+
+      - name: 🎬 Model Chalo + YouTube Upload
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          SHORT_INDEX: ${{ github.event.inputs.index }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TYPE="${{ github.event.inputs.type }}"
+          else
+            DOW=$(date +%u)
+            if [ "$DOW" = "1" ]; then TYPE=fact;
+            elif [ "$DOW" = "2" ]; then TYPE=quiz;
+            elif [ "$DOW" = "3" ]; then TYPE=story;
+            elif [ "$DOW" = "4" ]; then TYPE=factmyth;
+            elif [ "$DOW" = "5" ]; then TYPE=top5;
+            elif [ "$DOW" = "6" ]; then TYPE=fact;
+            else TYPE=quiz; fi
+            # shaam wali run me next model
+            HR=$(date +%H)
+            if [ "$HR" -ge "12" ]; then
+              if [ "$TYPE" = "fact" ]; then TYPE=top5;
+              elif [ "$TYPE" = "quiz" ]; then TYPE=factmyth;
+              elif [ "$TYPE" = "story" ]; then TYPE=fact;
+              elif [ "$TYPE" = "factmyth" ]; then TYPE=story;
+              else TYPE=quiz; fi
+            fi
+          fi
+          echo "Aaj ka model: $TYPE"
+          python cloud_shorts_v2.py --type "$TYPE" --upload
+
+      - name: 💾 Video File Save (Backup)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shorts-video-${{ github.run_number }}
+          path: output/short_*.mp4
+          retention-days: 7
