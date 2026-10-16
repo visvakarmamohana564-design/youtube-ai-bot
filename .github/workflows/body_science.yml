@@ -36,7 +36,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
-          pip install -q requests gTTS edge-tts Pillow numpy google-api-python-client google-auth google-auth-oauthlib google-auth-httplib2 google-api-core
+          pip install -q requests gTTS edge-tts Pillow numpy python-dotenv google-api-python-client google-auth google-auth-oauthlib google-auth-httplib2 google-api-core
 
       - name: 🎬 Videos Banao + Upload Karo
         env:
