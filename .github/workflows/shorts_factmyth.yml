@@ -1,0 +1,51 @@
+name: 🐙 Fact-or-Myth Shorts — Auto (Daily 7:15 AM IST)
+
+on:
+  schedule:
+    - cron: '45 1 * * *'   # 7:15 AM IST
+  workflow_dispatch:
+    inputs:
+      fact_index:
+        description: 'Optional Fact Number (0-11) — khali = aaj ka automatic'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  factmyth-short:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Python Setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Dependencies (ffmpeg + fonts)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+          pip install -q -r requirements.txt
+
+      - name: 🎬 Fact-or-Myth Short Banao + YouTube Upload
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          FACT_INDEX: ${{ github.event.inputs.fact_index }}
+        run: python cloud_shorts_factmyth.py --upload
+
+      - name: 💾 Video File Save (Backup)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: factmyth-short-video
+          path: output/short_factmyth_*.mp4
+          retention-days: 7
